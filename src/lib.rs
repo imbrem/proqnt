@@ -121,6 +121,20 @@ impl TryFrom<[u8; 5]> for Proquint {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct ProquintParseError(Option<[u8; 5]>);
 
+impl Display for ProquintParseError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if let Some(data) = self.0 {
+            write!(
+                f,
+                "{data:?} (utf-8 = {:?}) is not a valid proquint",
+                core::str::from_utf8(&data[..])
+            )
+        } else {
+            write!(f, "not enough characters to parse a proquint")
+        }
+    }
+}
+
 impl Proquint {
     /// Get the value of this proquint as a `u16`
     #[cfg_attr(not(tarpaulin), inline(always))]
@@ -328,7 +342,7 @@ pub struct ProquintEncode<T>(pub T);
 impl<T> IntoIterator for ProquintEncode<T>
 where
     T: IntoIterator,
-    T::Item: FractionalEncode<u16>,
+    T::Item: IntoFraction<u16>,
 {
     type Item = Proquint;
 
@@ -360,7 +374,7 @@ where
 impl<T> Display for ProquintEncode<T>
 where
     T: Clone + IntoIterator,
-    T::Item: FractionalEncode<u16>,
+    T::Item: IntoFraction<u16>,
 {
     #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -524,7 +538,7 @@ pub trait IntoProquints: Sized {
 
 impl<T> IntoProquints for T
 where
-    T: FractionalEncode<u16>,
+    T: IntoFraction<u16>,
 {
     type DigitsIter = <FractionalDigits<Once<T>, u16> as IntoIterator>::IntoIter;
 
@@ -612,93 +626,35 @@ pub enum ProquintsParseError {
     InvalidValue,
 }
 
-impl FromProquints for u8 {
-    type FromProquintsError = ProquintsParseError;
-
-    #[cfg_attr(not(tarpaulin), inline(always))]
-    fn from_proquints_partial(
-        mut proquints: impl Iterator<Item = u16>,
-    ) -> Result<Self, Self::FromProquintsError> {
-        let [hi, lo] = proquints
-            .next()
-            .ok_or(ProquintsParseError::NotEnoughProquints(1))?
-            .to_be_bytes();
-        if hi == 00 {
-            Ok(lo)
-        } else {
-            Err(ProquintsParseError::InvalidValue)
-        }
-    }
-
-    #[cfg_attr(not(tarpaulin), inline(always))]
-    fn trailing_error(next: Option<u16>) -> Self::FromProquintsError {
-        ProquintsParseError::TrailingData(next)
-    }
-}
-
-impl FromProquints for u16 {
-    type FromProquintsError = ProquintsParseError;
-
-    #[cfg_attr(not(tarpaulin), inline(always))]
-    fn from_proquints_partial(
-        mut proquints: impl Iterator<Item = u16>,
-    ) -> Result<Self, Self::FromProquintsError> {
-        proquints
-            .next()
-            .ok_or(ProquintsParseError::NotEnoughProquints(1))
-    }
-
-    #[cfg_attr(not(tarpaulin), inline(always))]
-    fn trailing_error(next: Option<u16>) -> Self::FromProquintsError {
-        ProquintsParseError::TrailingData(next)
-    }
-}
-
-impl FromProquints for i16 {
-    type FromProquintsError = ProquintsParseError;
-
-    #[cfg_attr(not(tarpaulin), inline(always))]
-    fn from_proquints_partial(
-        mut proquints: impl Iterator<Item = u16>,
-    ) -> Result<Self, Self::FromProquintsError> {
-        proquints
-            .next()
-            .map(|v| v as i16)
-            .ok_or(ProquintsParseError::NotEnoughProquints(1))
-    }
-
-    #[cfg_attr(not(tarpaulin), inline(always))]
-    fn trailing_error(next: Option<u16>) -> Self::FromProquintsError {
-        ProquintsParseError::TrailingData(next)
-    }
-}
-
-impl<const N: usize> FromProquints for [u8; N] {
-    type FromProquintsError = ProquintsParseError;
-
-    fn from_proquints_partial(
-        mut proquints: impl Iterator<Item = u16>,
-    ) -> Result<Self, Self::FromProquintsError> {
-        let mut data = [0; N];
-        for i in 0..N / 2 {
-            let [hi, lo] = proquints
-                .next()
-                .ok_or(ProquintsParseError::NotEnoughProquints(N / 2 + N % 2 - i))?
-                .to_be_bytes();
-            data[i * 2] = hi;
-            data[i * 2 + 1] = lo;
-        }
-        if N % 2 == 1 {
-            let [hi, lo] = proquints
-                .next()
-                .ok_or(ProquintsParseError::NotEnoughProquints(1))?
-                .to_be_bytes();
-            if hi != 0 {
-                return Err(ProquintsParseError::InvalidValue);
+impl Display for ProquintsParseError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ProquintsParseError::NotEnoughProquints(p) => {
+                write!(f, "expected at least {p:?} more proquints of data")
             }
-            data[N - 1] = lo
+            ProquintsParseError::TrailingData(d) => write!(f, "trailing data: {d:?}"),
+            ProquintsParseError::InvalidValue => write!(f, "invalid value"),
         }
-        Ok(data)
+    }
+}
+
+impl<T> FromProquints for T
+where
+    T: FromFraction<u16>,
+{
+    type FromProquintsError = ProquintsParseError;
+
+    #[cfg_attr(not(tarpaulin), inline(always))]
+    fn from_proquints_partial(
+        proquints: impl Iterator<Item = u16>,
+    ) -> Result<Self, Self::FromProquintsError> {
+        FromFraction::from_pieces(proquints).map_err(|err| {
+            if err.0 == 0 {
+                ProquintsParseError::InvalidValue
+            } else {
+                ProquintsParseError::NotEnoughProquints(err.0)
+            }
+        })
     }
 
     #[cfg_attr(not(tarpaulin), inline(always))]
@@ -706,52 +662,6 @@ impl<const N: usize> FromProquints for [u8; N] {
         ProquintsParseError::TrailingData(next)
     }
 }
-
-macro_rules! int_as_proquints {
-    ($t:ty, $e:expr) => {
-
-        impl FromProquints for $t {
-            type FromProquintsError = ProquintsParseError;
-
-            #[cfg_attr(not(tarpaulin), inline(always))]
-            fn from_proquints_partial(
-                mut proquints: impl Iterator<Item = u16>,
-            ) -> Result<Self, Self::FromProquintsError> {
-                let mut data: [u8; { $e * 2 }] = [0; { $e * 2 }];
-                let [hi, lo] = proquints
-                    .next()
-                    .ok_or(ProquintsParseError::NotEnoughProquints(1))?
-                    .to_be_bytes();
-                data[0] = hi;
-                data[1] = lo;
-                for i in 1..$e {
-                    if let Some(digit) = proquints.next() {
-                        let [hi, lo] = digit.to_be_bytes();
-                        data[i * 2] = hi;
-                        data[i * 2 + 1] = lo;
-                    } else {
-                        // For unspecified bits, the big end should be zero!
-                        data.rotate_left(i * 2);
-                        break
-                    }
-                }
-                Ok(<$t>::from_be_bytes(data))
-            }
-
-            #[cfg_attr(not(tarpaulin), inline(always))]
-            fn trailing_error(next: Option<u16>) -> Self::FromProquintsError {
-                ProquintsParseError::TrailingData(next)
-            }
-        }
-    };
-}
-
-int_as_proquints!(u32, 2);
-int_as_proquints!(u64, 4);
-int_as_proquints!(u128, 8);
-int_as_proquints!(i32, 2);
-int_as_proquints!(i64, 4);
-int_as_proquints!(i128, 8);
 
 #[cfg_attr(not(tarpaulin), inline(always))]
 pub(crate) fn be_encode_array_u16<const M: usize>(array: &[u8]) -> [u16; M] {
@@ -810,6 +720,7 @@ pub(crate) fn be_encode_array_i64<const M: usize>(array: &[u8]) -> [i64; M] {
 #[cfg(feature = "std")]
 mod std_ {
     use super::*;
+    use std::error::Error;
     use std::net::{Ipv4Addr, Ipv6Addr};
 
     impl IntoProquints for Ipv4Addr {
@@ -893,6 +804,10 @@ mod std_ {
             ProquintsParseError::TrailingData(next)
         }
     }
+
+    impl Error for ProquintParseError {}
+    impl Error for ProquintsParseError {}
+
 }
 
 #[cfg(test)]
@@ -1000,7 +915,7 @@ mod test {
 
         #[test]
         fn parse_proquints(v: Vec<u16>) {
-            let proquints = format!("{}", ProquintEncode(v.iter().cloned()));
+            let proquints = format!("{}", ProquintEncode(v));
             Iterator::eq(ParseProquintDigits::new(&proquints[..]), ParseProquints::new(&proquints[..]).map(u16::from));
             Iterator::eq(ParseProquintDigits::new(&proquints[..]).map(Proquint::from), ParseProquints::new(&proquints[..]));
             Iterator::eq(ParseProquintDigits::new(proquints.as_bytes()), ParseProquints::new(proquints.as_bytes()).map(u16::from));
@@ -1082,6 +997,26 @@ mod test {
         assert_eq!(
             "12345".parse::<Proquint>(),
             Err(ProquintParseError(Some(*b"12345")))
+        );
+        assert_eq!(
+            format!("{}", ProquintParseError(None)),
+            "not enough characters to parse a proquint"
+        );
+        assert_eq!(
+            format!("{}", ProquintParseError(Some(*b"xxxxx"))),
+            "[120, 120, 120, 120, 120] (utf-8 = Ok(\"xxxxx\")) is not a valid proquint"
+        );
+        assert_eq!(
+            format!("{}", ProquintsParseError::InvalidValue),
+            "invalid value"
+        );
+        assert_eq!(
+            format!("{}", ProquintsParseError::TrailingData(None)),
+            "trailing data: None"
+        );
+        assert_eq!(
+            format!("{}", ProquintsParseError::NotEnoughProquints(5)),
+            "expected at least 5 more proquints of data"
         );
     }
 

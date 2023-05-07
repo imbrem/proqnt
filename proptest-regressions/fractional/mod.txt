@@ -4,10 +4,6 @@
 #
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
-cc 712a5c602f5d488706a3e791370f8ceb0d6179fcbfd60b74109b5af4be80f6a0 # shrinks to mut i = [1]
-cc 32a724fe9941dc3ab8a4802c4f2facf21800ae795f453596c423cd3ebda4265c # shrinks to mut i = [-1]
-cc 136e822d220f8f9bc32abc22e1a91d014918c43a95c7331a9442b4b2f6c6e829 # shrinks to mut i = [1]
-cc a0eebf223435d7fc83622d7495fec322a44e3ff29fc084814d7d382bcf35ffcd # shrinks to mut i = [1]
-cc 825d2f9b4e5ca69e7250564034834659976185e91f7d09baa698680f4351bc05 # shrinks to mut i = [-1]
-cc a8c13c0547e1cb7e7eb7a75aafbf9c4c2e2eec3b83ea32328a2a3c514851d144 # shrinks to mut i = [1]
-cc 58b8676249d64bbc3d2f7626e5fc331d7f6cb42d7cb10a41542110285bff9538 # shrinks to mut i = [1]
+cc 8f1bc6ecea0102deeb67bc8bfaf657a8554a2a1a9b263621e0eef0f90b05ec2c # shrinks to mut i = [128]
+cc 66db92817a09006a1a807c6132be690f7fbbd62ada1486bbb490668ab890e2ce # shrinks to mut i = [32768]
+cc 373e84c1bb560f31bb26e247f324693080bb91bdbf1640ad01160a46d8bf9f49 # shrinks to i = 128
