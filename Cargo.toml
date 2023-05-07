@@ -2,6 +2,13 @@
 name = "proqnt"
 version = "0.1.0"
 edition = "2021"
+authors = ["Jad Ghalayini <jeg74@cl.cam.ac.uk>"]
+description = "Zero-copy proquint encoding and decoding"
+repository = "https://github.com/imbrem/equivalence"
+license = "0BSD or MIT or Apache-2.0"
+keywords = ["proquint", "zero-copy"]
+categories = ["no-std", "encoding", "parser-implementations", "value-formatting"]
+readme = "../README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

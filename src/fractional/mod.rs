@@ -181,48 +181,10 @@ where
     }
 }
 
-impl<'a, T, S> IntoFraction<S> for &'a T
-where
-    T: Clone,
-    T: IntoFraction<S>,
-{
-    type RestIter = T::RestIter;
-
-    #[cfg_attr(not(tarpaulin), inline(always))]
-    fn next_pieces(iter: impl Iterator<Item = Self>) -> Option<(S, Self::RestIter)> {
-        T::next_pieces(iter.cloned())
-    }
-
-    #[cfg_attr(not(tarpaulin), inline(always))]
-    fn empty_rest() -> Self::RestIter {
-        T::empty_rest()
-    }
-}
-
-impl<const N: usize, T, S> IntoFraction<S> for [T; N]
-where
-    T: IntoFraction<S>,
-{
-    type RestIter = <FractionalDigits<arrayvec::IntoIter<T, N>, S> as IntoIterator>::IntoIter;
-
-    #[cfg_attr(not(tarpaulin), inline(always))]
-    fn next_pieces(mut iter: impl Iterator<Item = Self>) -> Option<(S, Self::RestIter)> {
-        let next = ArrayVec::from(iter.next()?);
-        let mut digits = FractionalDigits::new(next).into_iter();
-        let first: S = digits.next()?;
-        Some((first, digits))
-    }
-
-    #[cfg_attr(not(tarpaulin), inline(always))]
-    fn empty_rest() -> Self::RestIter {
-        FractionalDigits::new(ArrayVec::new()).into_iter()
-    }
-}
-
 impl<const N: usize, T, S> FromFraction<S> for [T; N]
 where
     S: IntoFraction<T>,
-    T: MaybeNull,
+    T: MaybeNull + core::fmt::Debug,
 {
     fn from_pieces(mut iter: impl Iterator<Item = S>) -> Result<Self, FromFractionError> {
         let mut result: ArrayVec<T, N> = ArrayVec::new();
@@ -248,6 +210,7 @@ where
                     }
                 }
             }
+            result[rest_head..].rotate_left(head - rest_head)
         }
     }
 }
@@ -255,8 +218,99 @@ where
 #[cfg(feature = "std")]
 mod std_ {
     use super::*;
+    use std::net::{Ipv4Addr, Ipv6Addr};
 
     impl std::error::Error for FromFractionError {}
+
+    impl FromFraction<u8> for Ipv4Addr {
+        fn from_pieces(mut iter: impl Iterator<Item = u8>) -> Result<Self, FromFractionError> {
+            let a = iter.next().ok_or(FromFractionError(4))?;
+            let b = iter.next().ok_or(FromFractionError(3))?;
+            let c = iter.next().ok_or(FromFractionError(2))?;
+            let d = iter.next().ok_or(FromFractionError(1))?;
+            Ok(Ipv4Addr::new(a, b, c, d))
+        }
+    }
+
+    impl FromFraction<u16> for Ipv4Addr {
+        fn from_pieces(mut iter: impl Iterator<Item = u16>) -> Result<Self, FromFractionError> {
+            let [a, b] = iter.next().ok_or(FromFractionError(2))?.to_be_bytes();
+            let [c, d] = iter.next().ok_or(FromFractionError(1))?.to_be_bytes();
+            Ok(Ipv4Addr::new(a, b, c, d))
+        }
+    }
+
+    impl FromFraction<u32> for Ipv4Addr {
+        fn from_pieces(mut iter: impl Iterator<Item = u32>) -> Result<Self, FromFractionError> {
+            iter.next().ok_or(FromFractionError(1)).map(From::from)
+        }
+    }
+
+    impl FromFraction<u8> for Ipv6Addr {
+        fn from_pieces(mut iter: impl Iterator<Item = u8>) -> Result<Self, FromFractionError> {
+            let a = iter.next().ok_or(FromFractionError(16))?;
+            let b = iter.next().ok_or(FromFractionError(15))?;
+            let c = iter.next().ok_or(FromFractionError(14))?;
+            let d = iter.next().ok_or(FromFractionError(13))?;
+            let e = iter.next().ok_or(FromFractionError(12))?;
+            let f = iter.next().ok_or(FromFractionError(11))?;
+            let g = iter.next().ok_or(FromFractionError(10))?;
+            let h = iter.next().ok_or(FromFractionError(9))?;
+            let i = iter.next().ok_or(FromFractionError(8))?;
+            let j = iter.next().ok_or(FromFractionError(7))?;
+            let k = iter.next().ok_or(FromFractionError(6))?;
+            let l = iter.next().ok_or(FromFractionError(5))?;
+            let m = iter.next().ok_or(FromFractionError(4))?;
+            let n = iter.next().ok_or(FromFractionError(3))?;
+            let o = iter.next().ok_or(FromFractionError(2))?;
+            let p = iter.next().ok_or(FromFractionError(1))?;
+            Ok(Ipv6Addr::from([
+                a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p,
+            ]))
+        }
+    }
+
+    impl FromFraction<u16> for Ipv6Addr {
+        fn from_pieces(mut iter: impl Iterator<Item = u16>) -> Result<Self, FromFractionError> {
+            let a = iter.next().ok_or(FromFractionError(8))?;
+            let b = iter.next().ok_or(FromFractionError(7))?;
+            let c = iter.next().ok_or(FromFractionError(6))?;
+            let d = iter.next().ok_or(FromFractionError(5))?;
+            let e = iter.next().ok_or(FromFractionError(4))?;
+            let f = iter.next().ok_or(FromFractionError(3))?;
+            let g = iter.next().ok_or(FromFractionError(2))?;
+            let h = iter.next().ok_or(FromFractionError(1))?;
+            Ok(Ipv6Addr::new(a, b, c, d, e, f, g, h))
+        }
+    }
+
+    impl FromFraction<u32> for Ipv6Addr {
+        fn from_pieces(mut iter: impl Iterator<Item = u32>) -> Result<Self, FromFractionError> {
+            let [a, b, c, d] = iter.next().ok_or(FromFractionError(4))?.to_be_bytes();
+            let [e, f, g, h] = iter.next().ok_or(FromFractionError(3))?.to_be_bytes();
+            let [i, j, k, l] = iter.next().ok_or(FromFractionError(2))?.to_be_bytes();
+            let [m, n, o, p] = iter.next().ok_or(FromFractionError(1))?.to_be_bytes();
+            Ok(Ipv6Addr::from([
+                a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p,
+            ]))
+        }
+    }
+
+    impl FromFraction<u64> for Ipv6Addr {
+        fn from_pieces(mut iter: impl Iterator<Item = u64>) -> Result<Self, FromFractionError> {
+            let [a, b, c, d, e, f, g, h] = iter.next().ok_or(FromFractionError(2))?.to_be_bytes();
+            let [i, j, k, l, m, n, o, p] = iter.next().ok_or(FromFractionError(1))?.to_be_bytes();
+            Ok(Ipv6Addr::from([
+                a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p,
+            ]))
+        }
+    }
+
+    impl FromFraction<u128> for Ipv6Addr {
+        fn from_pieces(mut iter: impl Iterator<Item = u128>) -> Result<Self, FromFractionError> {
+            iter.next().ok_or(FromFractionError(1)).map(From::from)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -265,24 +319,61 @@ mod test {
     use proptest::prelude::*;
 
     proptest! {
+        #[test]
         fn from_u8_7_2_u32(i: [u8; 7]) {
             let mut digits = FractionalDigits::<_, u32>::new(i).into_iter();
             let hi = digits.next().unwrap();
             let lo = digits.next().unwrap();
             assert_eq!(digits.next(), None);
             assert!(lo < (1 << 24));
-            assert_eq!(<[u8; 7] as FromFraction<u32>>::from_pieces([hi, lo].into_iter()).unwrap(), i);
+            assert_eq!(<[u8; 7] as FromFraction<u32>>::from_pieces([hi, lo].into_iter()).unwrap(), i, "u32: {hi}, {lo}");
             let mut i2 = i;
             i2[0] |= 1;
             assert_eq!(<[u8; 7] as FromFraction<u32>>::from_pieces([hi | (1 << 24), lo].into_iter()).unwrap(), i2);
             assert_eq!(<[u8; 7] as FromFraction<u32>>::from_pieces([hi, lo | (1 << 24)].into_iter()), Err(FromFractionError(0)));
+        }
+
+
+        #[test]
+        fn u8_4_be_encode(i: [u8; 4]) {
+            let mut digits = FractionalDigits::<_, u16>::new(i).into_iter();
+            let hi = digits.next().unwrap();
+            let lo = digits.next().unwrap();
+            assert_eq!(digits.next(), None);
+            let ic: [u16; 2] = be_encode_array_u16(&i);
+            assert_eq!([hi, lo], ic);
+        }
+    }
+
+    #[cfg(feature = "std")]
+    proptest! {
+        #[test]
+        fn ipv4_roundtrip(i: std::net::Ipv4Addr) {
+            assert_eq!(FromFraction::from_pieces(i.octets().into_iter()), Ok(i));
+            assert_eq!(FromFraction::from_pieces(FractionalDigits::<_, u16>::new(i.octets()).into_iter()), Ok(i));
+            assert_eq!(FromFraction::from_pieces(FractionalDigits::<_, u32>::new(i.octets()).into_iter()), Ok(i));
+        }
+
+        #[test]
+        fn ipv6_roundtrip(i: std::net::Ipv6Addr) {
+            assert_eq!(FromFraction::from_pieces(i.octets().into_iter()), Ok(i));
+            assert_eq!(FromFraction::from_pieces(FractionalDigits::<_, u16>::new(i.octets()).into_iter()), Ok(i));
+            assert_eq!(FromFraction::from_pieces(FractionalDigits::<_, u32>::new(i.octets()).into_iter()), Ok(i));
+            assert_eq!(FromFraction::from_pieces(FractionalDigits::<_, u64>::new(i.octets()).into_iter()), Ok(i));
+            assert_eq!(FromFraction::from_pieces(FractionalDigits::<_, u128>::new(i.octets()).into_iter()), Ok(i));
         }
     }
 
     #[test]
     fn error_formatting() {
         assert_eq!(format!("{}", FromFractionError(0)), "invalid input");
-        assert_eq!(format!("{}", FromFractionError(1)), "expected at least 1 more fractional digits");
-        assert_eq!(format!("{}", FromFractionError(3)), "expected at least 3 more fractional digits");
+        assert_eq!(
+            format!("{}", FromFractionError(1)),
+            "expected at least 1 more fractional digits"
+        );
+        assert_eq!(
+            format!("{}", FromFractionError(3)),
+            "expected at least 3 more fractional digits"
+        );
     }
 }

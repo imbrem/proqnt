@@ -1,9 +1,4 @@
-/*!
-# proqnt
-A **pro**nounceable **quint**uplet, or *proquint*, is a pronounceable 5-letter string encoding a unique 16-bit integer.
-
-Proquints may be used to encode binary data such as IP addresses, public keys, and UUIDs in a more human-friendly way.
-*/
+#![doc = include_str!("../README.md")]
 #![forbid(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -522,9 +517,9 @@ impl<'a> Iterator for ParseProquints<&'a [u8]> {
 }
 
 /// Data which can be converted to a series of proquints
-pub trait IntoProquints: Sized {
+pub trait IntoProquints<'a>: Sized {
     /// An iterator over the proquint digits of this data
-    type DigitsIter: IntoIterator<Item = u16>;
+    type DigitsIter: IntoIterator<Item = u16> + 'a;
 
     /// Get the proquint digits of this data
     fn proquint_digits(self) -> Self::DigitsIter;
@@ -536,15 +531,40 @@ pub trait IntoProquints: Sized {
     }
 }
 
-impl<T> IntoProquints for T
+impl<'a, T> IntoProquints<'a> for T
 where
-    T: IntoFraction<u16>,
+    T: IntoFraction<u16> + 'a,
 {
     type DigitsIter = <FractionalDigits<Once<T>, u16> as IntoIterator>::IntoIter;
 
     #[cfg_attr(not(tarpaulin), inline(always))]
     fn proquint_digits(self) -> Self::DigitsIter {
         FractionalDigits::new(once(self)).into_iter()
+    }
+}
+
+impl<'a, const N: usize, T> IntoProquints<'a> for [T; N]
+where
+    T: IntoFraction<u16> + 'a,
+{
+    type DigitsIter =
+        <FractionalDigits<core::array::IntoIter<T, N>, u16> as IntoIterator>::IntoIter;
+
+    #[cfg_attr(not(tarpaulin), inline(always))]
+    fn proquint_digits(self) -> Self::DigitsIter {
+        FractionalDigits::new(self).into_iter()
+    }
+}
+
+impl<'a, T> IntoProquints<'a> for &'a [T]
+where
+    T: Clone + IntoFraction<u16> + 'a,
+{
+    type DigitsIter = <FractionalDigits<core::iter::Cloned<core::slice::Iter<'a, T>>, u16> as IntoIterator>::IntoIter;
+
+    #[cfg_attr(not(tarpaulin), inline(always))]
+    fn proquint_digits(self) -> Self::DigitsIter {
+        FractionalDigits::new(self.iter().cloned()).into_iter()
     }
 }
 
@@ -723,7 +743,7 @@ mod std_ {
     use std::error::Error;
     use std::net::{Ipv4Addr, Ipv6Addr};
 
-    impl IntoProquints for Ipv4Addr {
+    impl IntoProquints<'static> for Ipv4Addr {
         type DigitsIter = array::IntoIter<u16, 2>;
 
         #[cfg_attr(not(tarpaulin), inline(always))]
@@ -732,31 +752,7 @@ mod std_ {
         }
     }
 
-    impl FromProquints for Ipv4Addr {
-        type FromProquintsError = ProquintsParseError;
-
-        #[cfg_attr(not(tarpaulin), inline(always))]
-        fn from_proquints_partial(
-            mut proquints: impl Iterator<Item = u16>,
-        ) -> Result<Self, Self::FromProquintsError> {
-            let [b0, b1] = proquints
-                .next()
-                .ok_or(ProquintsParseError::NotEnoughProquints(2))?
-                .to_be_bytes();
-            let [b2, b3] = proquints
-                .next()
-                .ok_or(ProquintsParseError::NotEnoughProquints(1))?
-                .to_be_bytes();
-            Ok(Ipv4Addr::new(b0, b1, b2, b3))
-        }
-
-        #[cfg_attr(not(tarpaulin), inline(always))]
-        fn trailing_error(next: Option<u16>) -> Self::FromProquintsError {
-            ProquintsParseError::TrailingData(next)
-        }
-    }
-
-    impl IntoProquints for Ipv6Addr {
+    impl IntoProquints<'static> for Ipv6Addr {
         type DigitsIter = array::IntoIter<u16, 8>;
 
         #[cfg_attr(not(tarpaulin), inline(always))]
@@ -765,49 +761,8 @@ mod std_ {
         }
     }
 
-    impl FromProquints for Ipv6Addr {
-        type FromProquintsError = ProquintsParseError;
-
-        #[cfg_attr(not(tarpaulin), inline(always))]
-        fn from_proquints_partial(
-            mut proquints: impl Iterator<Item = u16>,
-        ) -> Result<Self, Self::FromProquintsError> {
-            let a = proquints
-                .next()
-                .ok_or(ProquintsParseError::NotEnoughProquints(8))?;
-            let b = proquints
-                .next()
-                .ok_or(ProquintsParseError::NotEnoughProquints(7))?;
-            let c = proquints
-                .next()
-                .ok_or(ProquintsParseError::NotEnoughProquints(6))?;
-            let d = proquints
-                .next()
-                .ok_or(ProquintsParseError::NotEnoughProquints(5))?;
-            let e = proquints
-                .next()
-                .ok_or(ProquintsParseError::NotEnoughProquints(4))?;
-            let f = proquints
-                .next()
-                .ok_or(ProquintsParseError::NotEnoughProquints(3))?;
-            let g = proquints
-                .next()
-                .ok_or(ProquintsParseError::NotEnoughProquints(2))?;
-            let h = proquints
-                .next()
-                .ok_or(ProquintsParseError::NotEnoughProquints(1))?;
-            Ok(Ipv6Addr::new(a, b, c, d, e, f, g, h))
-        }
-
-        #[cfg_attr(not(tarpaulin), inline(always))]
-        fn trailing_error(next: Option<u16>) -> Self::FromProquintsError {
-            ProquintsParseError::TrailingData(next)
-        }
-    }
-
     impl Error for ProquintParseError {}
     impl Error for ProquintsParseError {}
-
 }
 
 #[cfg(test)]
@@ -928,6 +883,11 @@ mod test {
         #[test]
         fn roundtrip_ipv4(i: std::net::Ipv4Addr) {
             roundtrip!(std::net::Ipv4Addr, i);
+            assert_eq!(i.proquint_digits().count(), 2);
+            assert_eq!(i.proquint_encode().into_iter().count(), 2);
+            assert!(i.proquint_digits().eq(i.octets().proquint_digits()));
+            assert!(i.proquint_encode().into_iter().eq(i.octets().proquint_encode().into_iter()));
+            assert_eq!(format!("{}", i.proquint_encode()), format!("{}", i.octets().proquint_encode()));
         }
 
         #[test]
@@ -1056,5 +1016,16 @@ mod test {
         for (ip, name) in ips {
             assert_eq!(format!("{}", ip.proquint_encode()), name);
         }
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn proquint_ips_octet_encode() {
+        use std::net::Ipv4Addr;
+        assert_eq!(Ipv4Addr::new(127, 0, 0, 1).octets(), [127, 0, 0, 1]);
+        assert_eq!(
+            format!("{}", Ipv4Addr::new(127, 0, 0, 1).proquint_encode()),
+            format!("{}", [127u8, 0, 0, 1].proquint_encode())
+        );
     }
 }
