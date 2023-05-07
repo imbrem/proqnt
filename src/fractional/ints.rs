@@ -46,16 +46,20 @@ macro_rules! maybe_null_impl {
                 *self == 0
             }
         }
-    }
+    };
 }
 
 macro_rules! into_fixed_fraction_impl {
     ($s:ty, $t:ty) => {
         impl $crate::fractional::IntoFixedFraction<$s> for $t {
-            const INPUT_CONSUMED: usize = if <$t>::BITS > <$s>::BITS { 1 } else { <$s>::BITS / <$t>::BITS } as usize;
+            const INPUT_CONSUMED: usize = if <$t>::BITS > <$s>::BITS {
+                1
+            } else {
+                <$s>::BITS / <$t>::BITS
+            } as usize;
             const REST_PRODUCED: usize = (<$s>::BITS / <$t>::BITS).saturating_sub(1) as usize;
         }
-    }
+    };
 }
 
 /// Implement [`FromFraction<S>`] using [`IntoFraction<T>`] where multiple `S` are required to make one `T`
@@ -64,8 +68,12 @@ macro_rules! fractional_decode_from_big {
     ($s:ty, $t:ty) => {
         impl $crate::fractional::FromFraction<$s> for $t {
             #[cfg_attr(not(tarpaulin), inline(always))]
-            fn from_pieces(mut iter: impl Iterator<Item = $s>) -> Result<$t, $crate::fractional::FromFractionError> {
-                if let Some((next, mut rest)) = $crate::fractional::IntoFraction::<$t>::next_pieces(&mut iter) {
+            fn from_pieces(
+                mut iter: impl Iterator<Item = $s>,
+            ) -> Result<$t, $crate::fractional::FromFractionError> {
+                if let Some((next, mut rest)) =
+                    $crate::fractional::IntoFraction::<$t>::next_pieces(&mut iter)
+                {
                     debug_assert_eq!(rest.next(), None);
                     Ok(next)
                 } else {
@@ -73,28 +81,32 @@ macro_rules! fractional_decode_from_big {
                 }
             }
         }
-    }
+    };
 }
 
 /// Implement [`FromFraction<S>`] using [`IntoFraction<T>`] where one `S` produces multiple `T`
-/// 
+///
 /// Requires that `T` implements [`MaybeNull`] to detect invalid trailing input
 #[macro_export]
 macro_rules! fractional_decode_from_small {
     ($s:ty, $t:ty) => {
         impl $crate::fractional::FromFraction<$s> for $t {
             #[cfg_attr(not(tarpaulin), inline(always))]
-            fn from_pieces(mut iter: impl Iterator<Item = $s>) -> Result<$t, $crate::fractional::FromFractionError> {
+            fn from_pieces(
+                mut iter: impl Iterator<Item = $s>,
+            ) -> Result<$t, $crate::fractional::FromFractionError> {
                 use $crate::fractional::MaybeNull;
-                if let Some((mut curr, mut rest)) = $crate::fractional::IntoFraction::<$t>::next_pieces(&mut iter) {
+                if let Some((mut curr, mut rest)) =
+                    $crate::fractional::IntoFraction::<$t>::next_pieces(&mut iter)
+                {
                     loop {
                         if let Some(next) = rest.next() {
                             if !curr.is_null() {
-                                return Err($crate::fractional::FromFractionError(0))
+                                return Err($crate::fractional::FromFractionError(0));
                             }
                             curr = next;
                         } else {
-                            return Ok(curr)
+                            return Ok(curr);
                         }
                     }
                 } else {
@@ -102,7 +114,7 @@ macro_rules! fractional_decode_from_small {
                 }
             }
         }
-    }
+    };
 }
 
 macro_rules! int_fractional_encode_u8 {
@@ -716,6 +728,7 @@ mod test {
     use super::*;
     use proptest::prelude::*;
 
+    #[cfg(feature = "std")]
     macro_rules! int_fractional_roundtrip {
         ($s:ty, $t:ty, $i:expr, $f:expr) => {{
             let mut i = $i.clone();
@@ -766,6 +779,7 @@ mod test {
         }};
     }
 
+    #[cfg(feature = "std")]
     proptest! {
         #[test]
         fn roundtrip_u8(mut i: Vec<u8>) {
@@ -906,6 +920,8 @@ mod test {
             int_fractional_roundtrip!(i128, i64, i, 1);
             int_fractional_roundtrip!(i128, i128, i, 1);
         }
+    }
+    proptest! {
 
         #[test]
         fn from_i8(i: i8) {

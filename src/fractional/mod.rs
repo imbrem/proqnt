@@ -364,6 +364,7 @@ mod test {
         }
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn error_formatting() {
         assert_eq!(format!("{}", FromFractionError(0)), "invalid input");

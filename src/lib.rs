@@ -3,7 +3,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use core::{
-    array,
     borrow::Borrow,
     fmt::{Debug, Display},
     iter::{once, Once},
@@ -744,7 +743,7 @@ mod std_ {
     use std::net::{Ipv4Addr, Ipv6Addr};
 
     impl IntoProquints<'static> for Ipv4Addr {
-        type DigitsIter = array::IntoIter<u16, 2>;
+        type DigitsIter = core::array::IntoIter<u16, 2>;
 
         #[cfg_attr(not(tarpaulin), inline(always))]
         fn proquint_digits(self) -> Self::DigitsIter {
@@ -753,7 +752,7 @@ mod std_ {
     }
 
     impl IntoProquints<'static> for Ipv6Addr {
-        type DigitsIter = array::IntoIter<u16, 8>;
+        type DigitsIter = core::array::IntoIter<u16, 8>;
 
         #[cfg_attr(not(tarpaulin), inline(always))]
         fn proquint_digits(self) -> Self::DigitsIter {
@@ -770,6 +769,7 @@ mod test {
     use super::*;
     use proptest::prelude::*;
 
+    #[cfg(feature = "std")]
     macro_rules! roundtrip {
         ($t:ty, $i:expr) => {{
             let mut encoded = format!("{}", $i.proquint_encode());
@@ -802,12 +802,18 @@ mod test {
             assert_eq!(as_str, <Proquint as Borrow<str>>::borrow(&pq));
             assert_eq!(as_str.as_bytes(), <Proquint as Borrow<[u8]>>::borrow(&pq));
             assert_eq!(as_str.as_bytes(), <Proquint as Borrow<[u8; 5]>>::borrow(&pq));
-            assert_eq!(format!("{pq}").parse::<Proquint>().unwrap(), pq);
-            assert_eq!(format!("{pq:?}").parse::<Proquint>().unwrap(), pq);
+            #[cfg(feature = "std")]
+            {
+                assert_eq!(format!("{pq}").parse::<Proquint>().unwrap(), pq);
+                assert_eq!(format!("{pq:?}").parse::<Proquint>().unwrap(), pq);
+            }
             assert_eq!(Proquint::try_from(*pq).unwrap(), pq);
             assert_eq!(Proquint::try_from(&pq[..]).unwrap(), pq);
         }
+    }
 
+    #[cfg(feature = "std")]
+    proptest! {
         #[test]
         fn roundtrip_u128(i: u128) {
             roundtrip!(u128, i);
@@ -876,10 +882,7 @@ mod test {
             Iterator::eq(ParseProquintDigits::new(proquints.as_bytes()), ParseProquints::new(proquints.as_bytes()).map(u16::from));
             Iterator::eq(ParseProquintDigits::new(proquints.as_bytes()).map(Proquint::from), ParseProquints::new(proquints.as_bytes()));
         }
-    }
 
-    #[cfg(feature = "std")]
-    proptest! {
         #[test]
         fn roundtrip_ipv4(i: std::net::Ipv4Addr) {
             roundtrip!(std::net::Ipv4Addr, i);
@@ -896,6 +899,7 @@ mod test {
         }
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn proquint_encode_nil() {
         assert_eq!(
@@ -958,26 +962,29 @@ mod test {
             "12345".parse::<Proquint>(),
             Err(ProquintParseError(Some(*b"12345")))
         );
-        assert_eq!(
-            format!("{}", ProquintParseError(None)),
-            "not enough characters to parse a proquint"
-        );
-        assert_eq!(
-            format!("{}", ProquintParseError(Some(*b"xxxxx"))),
-            "[120, 120, 120, 120, 120] (utf-8 = Ok(\"xxxxx\")) is not a valid proquint"
-        );
-        assert_eq!(
-            format!("{}", ProquintsParseError::InvalidValue),
-            "invalid value"
-        );
-        assert_eq!(
-            format!("{}", ProquintsParseError::TrailingData(None)),
-            "trailing data: None"
-        );
-        assert_eq!(
-            format!("{}", ProquintsParseError::NotEnoughProquints(5)),
-            "expected at least 5 more proquints of data"
-        );
+        #[cfg(feature = "std")]
+        {
+            assert_eq!(
+                format!("{}", ProquintParseError(None)),
+                "not enough characters to parse a proquint"
+            );
+            assert_eq!(
+                format!("{}", ProquintParseError(Some(*b"xxxxx"))),
+                "[120, 120, 120, 120, 120] (utf-8 = Ok(\"xxxxx\")) is not a valid proquint"
+            );
+            assert_eq!(
+                format!("{}", ProquintsParseError::InvalidValue),
+                "invalid value"
+            );
+            assert_eq!(
+                format!("{}", ProquintsParseError::TrailingData(None)),
+                "trailing data: None"
+            );
+            assert_eq!(
+                format!("{}", ProquintsParseError::NotEnoughProquints(5)),
+                "expected at least 5 more proquints of data"
+            );
+        }
     }
 
     #[test]
