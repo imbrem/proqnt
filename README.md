@@ -1,4 +1,11 @@
 # proqnt
+
+[![Version](https://img.shields.io/crates/v/proqnt)](https://crates.io/crates/proqnt)
+[![Documentation](https://img.shields.io/docsrs/proqnt)](https://docs.rs/proqnt/latest/proqnt/)
+[![Build](https://img.shields.io/github/actions/workflow/status/imbrem/proqnt/rust.yml)](https://github.com/imbrem/proqnt/actions)
+[![License](https://img.shields.io/crates/l/proqnt/0.1.0)](https://crates.io/crates/proqnt)
+[![Downloads](https://img.shields.io/crates/d/proqnt)](https://crates.io/crates/proqnt)
+
 A **pro**nounceable **quint**uplet, or *proquint*, is a pronounceable 5-letter string encoding a unique 16-bit integer.
 
 Proquints may be used to encode binary data such as IP addresses, public keys, and UUIDs in a more human-friendly way.
